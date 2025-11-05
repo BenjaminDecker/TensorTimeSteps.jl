@@ -20,7 +20,7 @@ function tdvp1(
     max_bond_dim::Int,
 )::Vector{MPS}
 
-    T = (step_size / sweeps_per_time_step) * (pi / 2) / 2
+    dt = step_size / sweeps_per_time_step / 2
 
     num_cells = length(H)
     @assert num_cells == length(psi_0)
@@ -59,7 +59,7 @@ function tdvp1(
                 psi[site_idx] = evolve(
                     psi[site_idx],
                     layers_left[end] * H[site_idx] * layers_right[end],
-                    T
+                    dt
                 )
                 if site_idx != num_cells
                     inds_left = uniqueinds(psi[site_idx], psi[site_idx+1])
@@ -73,7 +73,7 @@ function tdvp1(
                     new_bond = evolve(
                         bond,
                         layers_left[end] * layers_right[end],
-                        -T
+                        -dt
                     )
                     pop_layer!(layers_right)
                     psi[site_idx+1] *= new_bond
@@ -83,7 +83,7 @@ function tdvp1(
                 psi[site_idx] = evolve(
                     psi[site_idx],
                     layers_left[end] * H[site_idx] * layers_right[end],
-                    T
+                    dt
                 )
                 if site_idx != 1
                     inds_right = uniqueinds(psi[site_idx], psi[site_idx-1])
@@ -97,7 +97,7 @@ function tdvp1(
                     new_bond = evolve(
                         bond,
                         layers_left[end] * layers_right[end],
-                        -T
+                        -dt
                     )
                     pop_layer!(layers_left)
                     psi[site_idx-1] *= new_bond
@@ -119,7 +119,7 @@ function tdvp2(
     svd_epsilon::Float64=1e-10,
 )::Vector{MPS}
 
-    T = (step_size / sweeps_per_time_step) * (pi / 2) / 2
+    dt = step_size / sweeps_per_time_step / 2
 
     num_cells = length(H)
     @assert num_cells == length(psi_0)
@@ -152,7 +152,7 @@ function tdvp2(
                 two_site_tensor = evolve(
                     psi[site_idx] * psi[site_idx+1],
                     layers_left[end] * H[site_idx] * H[site_idx+1] * layers_right[end],
-                    T
+                    dt
                 )
                 inds_left = uniqueinds(psi[site_idx], psi[site_idx+1])
                 left, S, right = svd(
@@ -172,7 +172,7 @@ function tdvp2(
                     psi[site_idx+1] = evolve(
                         psi[site_idx+1],
                         layers_left[end] * H[site_idx+1] * layers_right[end],
-                        -T
+                        -dt
                     )
                     pop_layer!(layers_right)
                 end
@@ -181,7 +181,7 @@ function tdvp2(
                 two_site_tensor = evolve(
                     psi[site_idx-1] * psi[site_idx],
                     layers_left[end] * H[site_idx-1] * H[site_idx] * layers_right[end],
-                    T
+                    dt
                 )
                 inds_right = uniqueinds(psi[site_idx], psi[site_idx-1])
                 right, S, left = svd(
@@ -201,7 +201,7 @@ function tdvp2(
                     psi[site_idx-1] = evolve(
                         psi[site_idx-1],
                         layers_left[end] * H[site_idx-1] * layers_right[end],
-                        -T
+                        -dt
                     )
                     pop_layer!(layers_left)
                 end
