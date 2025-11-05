@@ -1,6 +1,6 @@
 name = "TensorTimeSteps"
 uuid = "1f4dac17-e489-46a5-8247-1c82af6382b6"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Benjamin Decker <39363928+BenjaminDecker@users.noreply.github.com>"]
 
 [deps]

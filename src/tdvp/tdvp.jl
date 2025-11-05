@@ -114,9 +114,9 @@ function tdvp2(
     psi_0::MPS;
     step_size::Complex,
     num_steps::Int,
-    sweeps_per_time_step::Int=100,
-    max_bond_dim::Int=32,
-    svd_epsilon::Float64=1e-10,
+    sweeps_per_time_step::Int,
+    max_bond_dim::Int,
+    svd_epsilon::Float64,
 )::Vector{MPS}
 
     dt = step_size / sweeps_per_time_step / 2
