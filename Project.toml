@@ -1,0 +1,16 @@
+name = "TensorTimeSteps"
+uuid = "1f4dac17-e489-46a5-8247-1c82af6382b6"
+version = "0.1.0"
+authors = ["Benjamin Decker <39363928+BenjaminDecker@users.noreply.github.com>"]
+
+[deps]
+ITensorMPS = "0d1a4710-d33b-49a5-8f18-73bdf49b47e2"
+ITensors = "9136182c-28ba-11e9-034c-db9fb085ebd5"
+KrylovKit = "0b1a1467-8014-51b9-945f-bf0ae24f4b77"
+ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
+
+[compat]
+ITensorMPS = "0.3.23"
+ITensors = "0.9.14"
+KrylovKit = "0.10.2"
+ProgressMeter = "1.11.0"
