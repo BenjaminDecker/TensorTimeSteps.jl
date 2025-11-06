@@ -37,7 +37,7 @@ function tdvp1(
     # https://itensor.discourse.group/t/how-do-i-set-an-mps-bond-dimension-that-is-higher-than-needed/1637
     psi = +(
         psi,
-        0 * randomMPS(siteinds(psi); linkdims=max_bond_dim - maximum(linkdims(psi)));
+        0 * random_mps(siteinds(psi); linkdims=max_bond_dim - maximum(linkdims(psi)));
         alg="directsum"
     )
     @assert maximum(linkdims(psi)) == max_bond_dim
@@ -53,7 +53,7 @@ function tdvp1(
         )
     end
 
-    @showprogress "Calculating Time Evolution" for _ in 2:num_steps
+    @showprogress desc = "Calculating Time Evolution" for _ in 2:num_steps
         for _ in 1:sweeps_per_time_step
             for site_idx in 1:num_cells
                 psi[site_idx] = evolve(
@@ -146,7 +146,7 @@ function tdvp2(
         )
     end
 
-    @showprogress "Calculating Time Evolution" for _ in 2:num_steps
+    @showprogress desc = "Calculating Time Evolution" for _ in 2:num_steps
         for _ in 1:sweeps_per_time_step
             for site_idx in 1:(num_cells-1)
                 two_site_tensor = evolve(
