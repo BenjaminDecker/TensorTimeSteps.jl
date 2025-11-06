@@ -49,7 +49,7 @@ T = 1
 num_steps = 100
 sweeps_per_time_step = 100
 max_bond_dim = 32
-svd_epsilon = 10e-10
+svd_epsilon = 1e-10
 
 results1 = tdvp1(
     H,
