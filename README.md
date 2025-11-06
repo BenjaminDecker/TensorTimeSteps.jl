@@ -26,7 +26,7 @@ sites = siteinds("Qubit", N)
 # Random initial product state
 psi_0 = MPS(
     sites,
-    map(x -> x ? "1" : "0", bitrand(length(site_inds)))
+    map(x -> x ? "1" : "0", bitrand(length(sites)))
 ) 
 
 # tfim Hamiltonian
