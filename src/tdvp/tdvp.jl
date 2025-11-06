@@ -4,8 +4,9 @@ function evolve(A::ITensor, H_eff::ITensor, T::Complex, do_normalize::Bool)::ITe
     new_A, info = exponentiate(H_eff, T, A, eager=true)
     @assert info.converged == 1
     if (do_normalize)
-        return normalize(new_A)
+        normalize!(new_A)
     end
+    return new_A
 end
 
 push_layer!(layers::Vector{ITensor}, site::ITensor, H_site::ITensor) =
