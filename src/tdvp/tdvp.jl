@@ -16,7 +16,7 @@ pop_layer!(layers::Vector{ITensor}) = pop!(layers)
 function tdvp1(
     H::MPO,
     psi_0::MPS;
-    step_size::Complex,
+    step_size::Union{ComplexF64,Float64},
     num_steps::Int,
     sweeps_per_time_step::Int,
     max_bond_dim::Int,
@@ -118,7 +118,7 @@ end
 function tdvp2(
     H::MPO,
     psi_0::MPS;
-    step_size::Complex,
+    step_size::Union{ComplexF64,Float64},
     num_steps::Int,
     sweeps_per_time_step::Int,
     max_bond_dim::Int,
