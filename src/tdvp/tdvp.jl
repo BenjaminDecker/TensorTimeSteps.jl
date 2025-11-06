@@ -1,9 +1,11 @@
 const TENSOR_1::ITensor = ITensor(1)
 
-function evolve(A::ITensor, H_eff::ITensor, T::ComplexF64)::ITensor
+function evolve(A::ITensor, H_eff::ITensor, T::Complex, normalize::Bool)::ITensor
     new_A, info = exponentiate(H_eff, T, A, eager=true)
     @assert info.converged == 1
-    return normalize(new_A)
+    if (normalize)
+        return normalize(new_A)
+    end
 end
 
 push_layer!(layers::Vector{ITensor}, site::ITensor, H_site::ITensor) =
@@ -18,6 +20,7 @@ function tdvp1(
     num_steps::Int,
     sweeps_per_time_step::Int,
     max_bond_dim::Int,
+    normalize::Bool=true
 )::Vector{MPS}
 
     dt = -im * step_size / sweeps_per_time_step / 2
@@ -41,7 +44,6 @@ function tdvp1(
         alg="directsum"
     )
     @assert maximum(linkdims(psi)) == max_bond_dim
-    @assert isapprox(inner(psi, psi_0), 1)
 
 
     orthogonalize!(psi, 1)
@@ -59,7 +61,8 @@ function tdvp1(
                 psi[site_idx] = evolve(
                     psi[site_idx],
                     layers_left[end] * H[site_idx] * layers_right[end],
-                    dt
+                    dt,
+                    normalize
                 )
                 if site_idx != num_cells
                     inds_left = uniqueinds(psi[site_idx], psi[site_idx+1])
@@ -73,7 +76,8 @@ function tdvp1(
                     new_bond = evolve(
                         bond,
                         layers_left[end] * layers_right[end],
-                        -dt
+                        -dt,
+                        normalize
                     )
                     pop_layer!(layers_right)
                     psi[site_idx+1] *= new_bond
@@ -83,7 +87,8 @@ function tdvp1(
                 psi[site_idx] = evolve(
                     psi[site_idx],
                     layers_left[end] * H[site_idx] * layers_right[end],
-                    dt
+                    dt,
+                    normalize
                 )
                 if site_idx != 1
                     inds_right = uniqueinds(psi[site_idx], psi[site_idx-1])
@@ -97,7 +102,8 @@ function tdvp1(
                     new_bond = evolve(
                         bond,
                         layers_left[end] * layers_right[end],
-                        -dt
+                        -dt,
+                        normalize
                     )
                     pop_layer!(layers_left)
                     psi[site_idx-1] *= new_bond
@@ -117,6 +123,7 @@ function tdvp2(
     sweeps_per_time_step::Int,
     max_bond_dim::Int,
     svd_epsilon::Float64,
+    normalize::Bool=true
 )::Vector{MPS}
 
     dt = -im * step_size / sweeps_per_time_step / 2
@@ -152,7 +159,8 @@ function tdvp2(
                 two_site_tensor = evolve(
                     psi[site_idx] * psi[site_idx+1],
                     layers_left[end] * H[site_idx] * H[site_idx+1] * layers_right[end],
-                    dt
+                    dt,
+                    normalize
                 )
                 inds_left = uniqueinds(psi[site_idx], psi[site_idx+1])
                 left, S, right = svd(
@@ -172,7 +180,8 @@ function tdvp2(
                     psi[site_idx+1] = evolve(
                         psi[site_idx+1],
                         layers_left[end] * H[site_idx+1] * layers_right[end],
-                        -dt
+                        -dt,
+                        normalize
                     )
                     pop_layer!(layers_right)
                 end
@@ -181,7 +190,8 @@ function tdvp2(
                 two_site_tensor = evolve(
                     psi[site_idx-1] * psi[site_idx],
                     layers_left[end] * H[site_idx-1] * H[site_idx] * layers_right[end],
-                    dt
+                    dt,
+                    normalize
                 )
                 inds_right = uniqueinds(psi[site_idx], psi[site_idx-1])
                 right, S, left = svd(
@@ -201,7 +211,8 @@ function tdvp2(
                     psi[site_idx-1] = evolve(
                         psi[site_idx-1],
                         layers_left[end] * H[site_idx-1] * layers_right[end],
-                        -dt
+                        -dt,
+                        normalize
                     )
                     pop_layer!(layers_left)
                 end
