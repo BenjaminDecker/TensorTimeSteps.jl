@@ -20,7 +20,7 @@ function tdvp1(
     max_bond_dim::Int,
 )::Vector{MPS}
 
-    dt = step_size / sweeps_per_time_step / 2
+    dt = -im * step_size / sweeps_per_time_step / 2
 
     num_cells = length(H)
     @assert num_cells == length(psi_0)
@@ -119,7 +119,7 @@ function tdvp2(
     svd_epsilon::Float64,
 )::Vector{MPS}
 
-    dt = step_size / sweeps_per_time_step / 2
+    dt = -im * step_size / sweeps_per_time_step / 2
 
     num_cells = length(H)
     @assert num_cells == length(psi_0)
