@@ -1,9 +1,9 @@
 const TENSOR_1::ITensor = ITensor(1)
 
-function evolve(A::ITensor, H_eff::ITensor, T::Complex, normalize::Bool)::ITensor
+function evolve(A::ITensor, H_eff::ITensor, T::Complex, do_normalize::Bool)::ITensor
     new_A, info = exponentiate(H_eff, T, A, eager=true)
     @assert info.converged == 1
-    if (normalize)
+    if (do_normalize)
         return normalize(new_A)
     end
 end
