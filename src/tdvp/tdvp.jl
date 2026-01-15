@@ -32,10 +32,12 @@ function tdvp1(
     layers_left::Vector{ITensor} = [TENSOR_1]
     layers_right::Vector{ITensor} = [TENSOR_1]
 
-    results = [deepcopy(psi_0)]
+    psi = deepcopy(psi_0)
+    truncate!(psi; maxdim=max_bond_dim)
+
+    results = [deepcopy(psi)]
     sizehint!(results, num_steps)
 
-    psi = deepcopy(psi_0)
 
     # Fix the bond dimensions
     # https://itensor.discourse.group/t/how-do-i-set-an-mps-bond-dimension-that-is-higher-than-needed/1637
