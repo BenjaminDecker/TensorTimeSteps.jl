@@ -36,7 +36,7 @@ function tdvp1(
     truncate!(psi; maxdim=max_bond_dim)
 
     results = [deepcopy(psi)]
-    sizehint!(results, num_steps)
+    sizehint!(results, num_steps + 1)
 
 
     # Fix the bond dimensions
@@ -58,7 +58,7 @@ function tdvp1(
         )
     end
 
-    @showprogress desc = "Calculating Time Evolution" for _ in 2:num_steps
+    @showprogress desc = "Calculating Time Evolution" for _ in 1:num_steps
         for _ in 1:sweeps_per_time_step
             for site_idx in 1:num_cells
                 psi[site_idx] = evolve(
@@ -143,7 +143,7 @@ function tdvp2(
     ]
 
     results = [deepcopy(psi_0)]
-    sizehint!(results, num_steps)
+    sizehint!(results, num_steps + 1)
 
     psi = deepcopy(psi_0)
 
@@ -156,7 +156,7 @@ function tdvp2(
         )
     end
 
-    @showprogress desc = "Calculating Time Evolution" for _ in 2:num_steps
+    @showprogress desc = "Calculating Time Evolution" for _ in 1:num_steps
         for _ in 1:sweeps_per_time_step
             for site_idx in 1:(num_cells-1)
                 two_site_tensor = evolve(
