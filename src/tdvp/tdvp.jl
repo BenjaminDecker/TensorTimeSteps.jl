@@ -137,8 +137,9 @@ function tdvp2(
     layers_left::Vector{ITensor} = [TENSOR_1]
     layers_right::Vector{ITensor} = [TENSOR_1]
 
+    local_site_dim = dim(siteind(first, H, 1))
     max_bond_dims::Vector{Int} = [
-        min(2^i, 2^(num_cells - i), max_bond_dim)
+        min(local_site_dim^i, local_site_dim^(num_cells - i), max_bond_dim)
         for i in 1:(num_cells-1)
     ]
 
