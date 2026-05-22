@@ -9,8 +9,10 @@ function evolve(A::ITensor, H_eff::ITensor, T::Complex, do_normalize::Bool)::ITe
     return new_A
 end
 
-push_layer!(layers::Vector{ITensor}, site::ITensor, H_site::ITensor) =
-    push!(layers, layers[end] * site * H_site * dag(prime(site)))
+function push_layer!(layers::Vector{ITensor}, site::ITensor, H_site::ITensor)
+    new_layer = contract((layers[end], site, H_site, dag(prime(site))), sequence="automatic")
+    push!(layers, new_layer)
+end
 
 pop_layer!(layers::Vector{ITensor}) = pop!(layers)
 
@@ -63,7 +65,7 @@ function tdvp1(
             for site_idx in 1:num_cells
                 psi[site_idx] = evolve(
                     psi[site_idx],
-                    layers_left[end] * H[site_idx] * layers_right[end],
+                    contract((layers_left[end], H[site_idx], layers_right[end]), sequence="automatic"),
                     dt,
                     normalize
                 )
@@ -89,7 +91,7 @@ function tdvp1(
             for site_idx in num_cells:-1:1
                 psi[site_idx] = evolve(
                     psi[site_idx],
-                    layers_left[end] * H[site_idx] * layers_right[end],
+                    contract((layers_left[end], H[site_idx], layers_right[end]), sequence="automatic"),
                     dt,
                     normalize
                 )
@@ -138,6 +140,7 @@ function tdvp2(
     layers_right::Vector{ITensor} = [TENSOR_1]
 
     local_site_dim = dim(siteind(first, H, 1))
+
     max_bond_dims::Vector{Int} = [
         min(local_site_dim^i, local_site_dim^(num_cells - i), max_bond_dim)
         for i in 1:(num_cells-1)
@@ -162,7 +165,7 @@ function tdvp2(
             for site_idx in 1:(num_cells-1)
                 two_site_tensor = evolve(
                     psi[site_idx] * psi[site_idx+1],
-                    layers_left[end] * H[site_idx] * H[site_idx+1] * layers_right[end],
+                    contract((layers_left[end], H[site_idx], H[site_idx+1], layers_right[end]), sequence="automatic"),
                     dt,
                     normalize
                 )
@@ -183,7 +186,7 @@ function tdvp2(
                     )
                     psi[site_idx+1] = evolve(
                         psi[site_idx+1],
-                        layers_left[end] * H[site_idx+1] * layers_right[end],
+                        contract((layers_left[end], H[site_idx+1], layers_right[end]), sequence="automatic"),
                         -dt,
                         normalize
                     )
@@ -193,7 +196,7 @@ function tdvp2(
             for site_idx in num_cells:-1:2
                 two_site_tensor = evolve(
                     psi[site_idx-1] * psi[site_idx],
-                    layers_left[end] * H[site_idx-1] * H[site_idx] * layers_right[end],
+                    contract((layers_left[end], H[site_idx-1], H[site_idx], layers_right[end]), sequence="automatic"),
                     dt,
                     normalize
                 )
@@ -214,7 +217,7 @@ function tdvp2(
                     )
                     psi[site_idx-1] = evolve(
                         psi[site_idx-1],
-                        layers_left[end] * H[site_idx-1] * layers_right[end],
+                        contract((layers_left[end], H[site_idx-1], layers_right[end]), sequence="automatic"),
                         -dt,
                         normalize
                     )

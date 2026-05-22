@@ -1,8 +1,9 @@
 module TensorTimeSteps
 
+using TensorOperations
+using KrylovKit
 using ITensors
 using ITensorMPS
-using KrylovKit
 using ProgressMeter
 
 include("tdvp/tdvp.jl")
