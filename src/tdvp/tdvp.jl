@@ -31,6 +31,9 @@ function tdvp1(
     num_cells = length(H)
     @assert num_cells == length(psi_0)
 
+    local_site_dim = dim(siteind(first, H, 1))
+    max_bond_dim = min(max_bond_dim, local_site_dim^(num_cells ÷ 2))
+
     layers_left::Vector{ITensor} = [TENSOR_1]
     layers_right::Vector{ITensor} = [TENSOR_1]
 
