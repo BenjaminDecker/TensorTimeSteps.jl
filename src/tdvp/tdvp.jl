@@ -37,22 +37,22 @@ function tdvp1(
     layers_left::Vector{ITensor} = [TENSOR_1]
     layers_right::Vector{ITensor} = [TENSOR_1]
 
+
     psi = deepcopy(psi_0)
     truncate!(psi; maxdim=max_bond_dim)
 
-    results = [deepcopy(psi)]
-    sizehint!(results, num_steps + 1)
-
-
     # Fix the bond dimensions
     # https://itensor.discourse.group/t/how-do-i-set-an-mps-bond-dimension-that-is-higher-than-needed/1637
-    psi = +(
-        psi,
-        0 * random_mps(siteinds(psi); linkdims=max_bond_dim - maximum(linkdims(psi)));
-        alg="directsum"
-    )
-    @assert maximum(linkdims(psi)) == max_bond_dim
+    while maximum(linkdims(psi)) != max_bond_dim
+        psi = +(
+            psi,
+            0 * random_mps(siteinds(psi); linkdims=max_bond_dim - maximum(linkdims(psi)));
+            alg="directsum"
+        )
+    end
 
+    results = [deepcopy(psi)]
+    sizehint!(results, num_steps + 1)
 
     orthogonalize!(psi, 1)
     for site_idx in num_cells:-1:2
