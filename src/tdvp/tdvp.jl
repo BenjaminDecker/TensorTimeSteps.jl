@@ -26,33 +26,49 @@ function tdvp1(
     normalize::Bool=true
 )::Vector{MPS}
 
-    dt = -im * step_size / sweeps_per_time_step / 2
-
     num_cells = length(H)
     @assert num_cells == length(psi_0)
 
     local_site_dim = dim(siteind(first, H, 1))
     max_bond_dim = min(max_bond_dim, local_site_dim^(num_cells ÷ 2))
-
-    layers_left::Vector{ITensor} = [TENSOR_1]
-    layers_right::Vector{ITensor} = [TENSOR_1]
-
+    max_bond_dims::Vector{Int} = [
+        min(local_site_dim^i, local_site_dim^(num_cells - i), max_bond_dim)
+        for i in 1:(num_cells-1)
+    ]
 
     psi = deepcopy(psi_0)
     truncate!(psi; maxdim=max_bond_dim)
 
+    site_inds = siteinds(psi)
+    link_inds = [Index(max_bond_dims[n] - linkdims(psi)[n], "Link,l=$n") for n in eachindex(max_bond_dims)]
+
+    bond_increaser = MPS(num_cells)
+    for n in 1:num_cells
+        if n == 1
+            bond_increaser[n] = ITensor(site_inds[n], link_inds[n])
+        elseif n == num_cells
+            bond_increaser[n] = ITensor(link_inds[n-1], site_inds[n])
+        else
+            bond_increaser[n] = ITensor(link_inds[n-1], site_inds[n], link_inds[n])
+        end
+    end
+
     # Fix the bond dimensions
     # https://itensor.discourse.group/t/how-do-i-set-an-mps-bond-dimension-that-is-higher-than-needed/1637
-    while maximum(linkdims(psi)) != max_bond_dim
-        psi = +(
-            psi,
-            0 * random_mps(siteinds(psi); linkdims=max_bond_dim - maximum(linkdims(psi)));
-            alg="directsum"
-        )
-    end
+    psi = +(
+        psi,
+        0 * bond_increaser;
+        alg="directsum"
+    )
+
+
+    dt = -im * step_size / sweeps_per_time_step / 2
 
     results = [deepcopy(psi)]
     sizehint!(results, num_steps + 1)
+
+    layers_left::Vector{ITensor} = [TENSOR_1]
+    layers_right::Vector{ITensor} = [TENSOR_1]
 
     orthogonalize!(psi, 1)
     for site_idx in num_cells:-1:2
@@ -131,16 +147,12 @@ function tdvp2(
     sweeps_per_time_step::Int,
     max_bond_dim::Int,
     svd_epsilon::Float64,
-    normalize::Bool=true
+    normalize::Bool=true,
+    switch_when_maxdim_reached::Bool=true
 )::Vector{MPS}
-
-    dt = -im * step_size / sweeps_per_time_step / 2
 
     num_cells = length(H)
     @assert num_cells == length(psi_0)
-
-    layers_left::Vector{ITensor} = [TENSOR_1]
-    layers_right::Vector{ITensor} = [TENSOR_1]
 
     local_site_dim = dim(siteind(first, H, 1))
 
@@ -154,6 +166,11 @@ function tdvp2(
 
     psi = deepcopy(psi_0)
 
+    layers_left::Vector{ITensor} = [TENSOR_1]
+    layers_right::Vector{ITensor} = [TENSOR_1]
+
+    dt = -im * step_size / sweeps_per_time_step / 2
+
     orthogonalize!(psi, 1)
     for site_idx in num_cells:-1:3
         push_layer!(
@@ -163,7 +180,14 @@ function tdvp2(
         )
     end
 
-    @showprogress desc = "Calculating Time Evolution" for _ in 1:num_steps
+    @showprogress desc = "Calculating Time Evolution" for step_idx in 1:num_steps
+
+        if switch_when_maxdim_reached && maximum(linkdims(psi)) >= max_bond_dim
+            println()
+            println("Maximum bond dimension reached, switching to 1-site TDVP...")
+            return [results[1:end-1]; tdvp1(H, psi; step_size, num_steps=num_steps - step_idx + 1, sweeps_per_time_step, max_bond_dim, normalize)]
+        end
+
         for _ in 1:sweeps_per_time_step
             for site_idx in 1:(num_cells-1)
                 two_site_tensor = evolve(
