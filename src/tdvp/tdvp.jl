@@ -16,6 +16,81 @@ end
 
 pop_layer!(layers::Vector{ITensor}) = pop!(layers)
 
+function fix_bond_dims(psi::MPS, H::MPO, max_bond_dims::Vector{Int})::MPS
+    max_bond_dim = maximum(max_bond_dims)
+    psi = truncate(psi; maxdim=max_bond_dim, cutoff=0.0)
+    site_inds = siteinds(psi)
+    if hasqns(site_inds[1])
+        check_bond_dims(psi) = ((linkdims(psi) - max_bond_dims .< 0) |> sum) == 0
+
+        last_linkdims = linkdims(psi)
+        try_counter = 0
+        while !check_bond_dims(psi)
+            println(repeat('-', 80))
+            try_counter += 1
+            krylovdim = 2^try_counter
+            println("Artificially increasing bond dimension of initial state. Attempt $(try_counter) with krylovdim $(krylovdim)")
+            psi = expand(psi, H; alg="global_krylov", krylovdim=krylovdim)
+            @show max_bond_dims
+            @show linkdims(psi)
+            if last_linkdims == linkdims(psi)
+                println("Linkdims did not change. Trying with 'cutoff=0.0'.")
+                psi = expand(psi, H; alg="global_krylov", krylovdim=krylovdim, cutoff=0.0)
+            end
+            if last_linkdims == linkdims(psi)
+                println("Linkdims did not change. Initial state will have a lower bond dimension than requested. Cancelling expansion.")
+                break
+            end
+            last_linkdims = linkdims(psi)
+        end
+
+        println(repeat('-', 80))
+        @show max_bond_dims
+        @show linkdims(psi)
+        println("If linkdims are higher than the maximum, they will be truncated during the first sweep to fit max_bond_dims.")
+        println(repeat('-', 80))
+        psi
+    else
+        link_inds = [Index(max_bond_dims[n] - linkdims(psi)[n], "Link,l=$n") for n in eachindex(max_bond_dims)]
+        num_cells = length(psi)
+
+        bond_increaser = MPS(num_cells)
+        for n in 1:num_cells
+            if n == 1
+                bond_increaser[n] = ITensor(site_inds[n], link_inds[n])
+            elseif n == num_cells
+                bond_increaser[n] = ITensor(link_inds[n-1], site_inds[n])
+            else
+                bond_increaser[n] = ITensor(link_inds[n-1], site_inds[n], link_inds[n])
+            end
+        end
+
+        # Fix the bond dimensions
+        # https://itensor.discourse.group/t/how-do-i-set-an-mps-bond-dimension-that-is-higher-than-needed/1637
+        +(
+            psi,
+            0 * bond_increaser;
+            alg="directsum"
+        )
+    end
+end
+
+function truncate_to_exact_bond_dims!(psi::MPS, link_dims::Vector{Int})::MPS
+    orthogonalize!(psi, 1)
+    for i in eachindex(linkdims(psi))
+        inds_left = uniqueinds(psi[i], psi[i+1])
+        left, S, right = svd(
+            contract(psi[i], psi[i+1]),
+            inds_left;
+            maxdim=link_dims[i],
+            cutoff=0.0
+        )
+        psi[i] = left
+        psi[i+1] = contract(S, right)
+    end
+    psi
+end
+
 function tdvp1(
     H::MPO,
     psi_0::MPS;
@@ -36,31 +111,7 @@ function tdvp1(
         for i in 1:(num_cells-1)
     ]
 
-    psi = deepcopy(psi_0)
-    truncate!(psi; maxdim=max_bond_dim)
-
-    site_inds = siteinds(psi)
-    link_inds = [Index(max_bond_dims[n] - linkdims(psi)[n], "Link,l=$n") for n in eachindex(max_bond_dims)]
-
-    bond_increaser = MPS(num_cells)
-    for n in 1:num_cells
-        if n == 1
-            bond_increaser[n] = ITensor(site_inds[n], link_inds[n])
-        elseif n == num_cells
-            bond_increaser[n] = ITensor(link_inds[n-1], site_inds[n])
-        else
-            bond_increaser[n] = ITensor(link_inds[n-1], site_inds[n], link_inds[n])
-        end
-    end
-
-    # Fix the bond dimensions
-    # https://itensor.discourse.group/t/how-do-i-set-an-mps-bond-dimension-that-is-higher-than-needed/1637
-    psi = +(
-        psi,
-        0 * bond_increaser;
-        alg="directsum"
-    )
-
+    psi = fix_bond_dims(psi_0, H, max_bond_dims)
 
     dt = -im * step_size / sweeps_per_time_step / 2
 
@@ -80,6 +131,7 @@ function tdvp1(
     end
 
     @showprogress desc = "Calculating Time Evolution" for _ in 1:num_steps
+        println(linkdims(psi))
         for _ in 1:sweeps_per_time_step
             for site_idx in 1:num_cells
                 psi[site_idx] = evolve(
@@ -90,7 +142,20 @@ function tdvp1(
                 )
                 if site_idx != num_cells
                     inds_left = uniqueinds(psi[site_idx], psi[site_idx+1])
-                    site_orthogonal, bond = qr(psi[site_idx], inds_left)
+                    site_orthogonal, bond = (
+                        if linkdims(psi)[site_idx] > max_bond_dims[site_idx]
+                            left, S, right = svd(
+                                psi[site_idx],
+                                inds_left;
+                                maxdim=max_bond_dims[site_idx],
+                                mindim=max_bond_dims[site_idx],
+                                cutoff=0.0
+                            )
+                            left, contract(S, right)
+                        else
+                            qr(psi[site_idx], inds_left)
+                        end
+                    )
                     psi[site_idx] = site_orthogonal
                     push_layer!(
                         layers_left,
@@ -116,7 +181,20 @@ function tdvp1(
                 )
                 if site_idx != 1
                     inds_right = uniqueinds(psi[site_idx], psi[site_idx-1])
-                    site_orthogonal, bond = qr(psi[site_idx], inds_right)
+                    site_orthogonal, bond = (
+                        if linkdims(psi)[site_idx-1] > max_bond_dims[site_idx-1]
+                            right, S, left = svd(
+                                two_site_tensor,
+                                inds_right;
+                                maxdim=max_bond_dims[site_idx-1],
+                                mindim=max_bond_dims[site_idx-1],
+                                cutoff=0.0
+                            )
+                            right, contract(S, left)
+                        else
+                            qr(psi[site_idx], inds_right)
+                        end
+                    )
                     psi[site_idx] = site_orthogonal
                     push_layer!(
                         layers_right,
@@ -181,6 +259,7 @@ function tdvp2(
     end
 
     @showprogress desc = "Calculating Time Evolution" for step_idx in 1:num_steps
+        println(linkdims(psi))
 
         if switch_when_maxdim_reached && maximum(linkdims(psi)) >= max_bond_dim
             println()
