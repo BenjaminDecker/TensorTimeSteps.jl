@@ -130,8 +130,9 @@ function tdvp1(
         )
     end
 
-    @showprogress desc = "Calculating Time Evolution" for _ in 1:num_steps
-        println(linkdims(psi))
+    p = Progress(num_steps; desc="Running 1-site TDVP", showspeed=true)
+    for _ in 1:num_steps
+        next!(p; showvalues=[("Linkdims", linkdims(psi))])
         for _ in 1:sweeps_per_time_step
             for site_idx in 1:num_cells
                 psi[site_idx] = evolve(
@@ -214,6 +215,7 @@ function tdvp1(
         end
         push!(results, copy(psi))
     end
+    finish!(p)
     return results
 end
 
@@ -258,12 +260,13 @@ function tdvp2(
         )
     end
 
-    @showprogress desc = "Calculating Time Evolution" for step_idx in 1:num_steps
-        println(linkdims(psi))
-
+    p = Progress(num_steps; desc="Running 2-site TDVP", showspeed=true)
+    for step_idx in 1:num_steps
+        next!(p; showvalues=[("Linkdims", linkdims(psi))])
         if switch_when_maxdim_reached && maximum(linkdims(psi)) >= max_bond_dim
             println()
             println("Maximum bond dimension reached, switching to 1-site TDVP...")
+            finish!(p)
             return [results[1:end-1]; tdvp1(H, psi; step_size, num_steps=num_steps - step_idx + 1, sweeps_per_time_step, max_bond_dim, normalize)]
         end
 
@@ -333,5 +336,6 @@ function tdvp2(
         end
         push!(results, copy(psi))
     end
+    finish!(p)
     return results
 end
