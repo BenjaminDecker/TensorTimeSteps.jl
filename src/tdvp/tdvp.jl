@@ -98,7 +98,8 @@ function tdvp1(
     num_steps::Int,
     sweeps_per_time_step::Int,
     max_bond_dim::Int,
-    normalize::Bool=true
+    normalize::Bool=true,
+    expand_bond_dims=true,
 )::Vector{MPS}
 
     num_cells = length(H)
@@ -111,7 +112,10 @@ function tdvp1(
         for i in 1:(num_cells-1)
     ]
 
-    psi = fix_bond_dims(psi_0, H, max_bond_dims)
+    psi = psi_0
+    if expand_bond_dims
+        psi = fix_bond_dims(psi_0, H, max_bond_dims)
+    end
 
     dt = -im * step_size / sweeps_per_time_step / 2
 
@@ -267,7 +271,19 @@ function tdvp2(
             println()
             println("Maximum bond dimension reached, switching to 1-site TDVP...")
             finish!(p)
-            return [results[1:end-1]; tdvp1(H, psi; step_size, num_steps=num_steps - step_idx + 1, sweeps_per_time_step, max_bond_dim, normalize)]
+            return [
+                results[1:(end-1)];
+                tdvp1(
+                    H,
+                    psi;
+                    step_size,
+                    num_steps=num_steps - step_idx + 1,
+                    sweeps_per_time_step,
+                    max_bond_dim,
+                    normalize,
+                    expand_bond_dims=false
+                )
+            ]
         end
 
         for _ in 1:sweeps_per_time_step
