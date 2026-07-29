@@ -7,7 +7,7 @@
 Given a Hamiltonian operator $H$ in [MPO](https://tensornetwork.org/mpo/) form, and an initial state $\psi_0$ in [MPS](https://tensornetwork.org/mps/) form, calculate
 
 $$
-\psi(t_k)=e^{-iHk\Delta t}\psi_0~,~~k=0,1,\dots,N 
+\psi(t_k)=e^{-iHk\Delta t}~\psi _0~,~~k\in \lbrace 0,1,\dots,N\rbrace 
 $$
 
 <br/>
