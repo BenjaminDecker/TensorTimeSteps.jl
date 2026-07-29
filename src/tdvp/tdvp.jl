@@ -232,7 +232,8 @@ function tdvp2(
     max_bond_dim::Int,
     svd_epsilon::Float64,
     normalize::Bool=true,
-    switch_when_maxdim_reached::Bool=true
+    switch_when_maxdim_reached::Bool=true,
+    wait_steps_before_switch::Int=0
 )::Vector{MPS}
 
     num_cells = length(H)
@@ -267,9 +268,9 @@ function tdvp2(
     p = Progress(num_steps; desc="Running 2-site TDVP", showspeed=true)
     for step_idx in 1:num_steps
         next!(p; showvalues=[("Linkdims", linkdims(psi))])
-        if switch_when_maxdim_reached && maximum(linkdims(psi)) >= max_bond_dim
+        if switch_when_maxdim_reached && (step_idx>wait_steps_before_switch) && maximum(linkdims(psi)) >= max_bond_dim
             println()
-            println("Maximum bond dimension reached, switching to 1-site TDVP...")
+            println("Maximum bond dimension reached $(wait_steps_before_switch) time steps ago, switching to 1-site TDVP...")
             finish!(p)
             return [
                 results[1:(end-1)];
