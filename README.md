@@ -1,6 +1,8 @@
 # TensorTimeSteps.jl
 
-### A collection of time evolution algorithms for tensor network states
+[![Run tests](https://github.com/BenjaminDecker/TensorTimeSteps.jl/actions/workflows/test.yml/badge.svg)](https://github.com/BenjaminDecker/TensorTimeSteps.jl/actions/workflows/test.yml)
+
+## A collection of time evolution algorithms for tensor network states
 
 Given a Hamiltonian operator $H$ in [MPO](https://tensornetwork.org/mpo/) form, and an initial state $\psi_0$ in [MPS](https://tensornetwork.org/mps/) form, calculate
 
@@ -12,7 +14,7 @@ $$
 
 For now, only the 1-site and 2-site [TDVP](https://tensornetwork.org/mps/algorithms/timeevo/tdvp.html) algorithms are supported, and $H$ and $\psi_0$ must be given as [ITensor](https://docs.itensor.org/ITensorMPS/stable/examples/MPSandMPO.html) MPS/MPO types.
 
-## Usage
+### Usage
 
 Provide some $H$ and $\psi_0$
 ```julia
