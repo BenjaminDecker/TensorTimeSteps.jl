@@ -1,6 +1,6 @@
 name = "TensorTimeSteps"
 uuid = "1f4dac17-e489-46a5-8247-1c82af6382b6"
-version = "0.1.16"
+version = "0.1.17"
 authors = ["Benjamin Decker <39363928+BenjaminDecker@users.noreply.github.com>"]
 
 [deps]
@@ -16,7 +16,7 @@ ITensors = "0.9.14"
 KrylovKit = "0.10.2"
 ProgressMeter = "1.11.0"
 TensorOperations = "5.6.0"
-julia = "1.10"
+julia = "1.12"
 
 [workspace]
 projects = ["test"]
