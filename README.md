@@ -4,7 +4,7 @@
 
 ## A collection of time evolution algorithms for tensor network states
 
-Given a Hamiltonian operator $H$ in [MPO](https://tensornetwork.org/mpo/) form, and an initial state $\psi_0$ in [MPS](https://tensornetwork.org/mps/) form, calculate
+Given a Hamiltonian operator $H$ in [MPO](https://tensornetwork.org/mpo/) form, an initial state $\psi_0$ in [MPS](https://tensornetwork.org/mps/) form, and a step size $\Delta t$, calculate
 
 $$
 \psi(t_k)=e^{-iHk\Delta t}~\psi _0~,~~k\in \lbrace 0,1,\dots,N\rbrace 
