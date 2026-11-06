@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Decker"
+  given-names: "Benjamin"
+  orcid: "https://orcid.org/0000-0002-0921-0026"
+title: "TensorTimeSteps.jl"
+date-released: 2026-11-06
+url: "https://github.com/BenjaminDecker/TensorTimeSteps.jl"
