@@ -8,7 +8,6 @@ function sum_of_products(ops::Vector{Vector{MPO}}; maxdim, nsweeps=50, tol=1e-20
         trunc(op) = truncate(op; maxdim=initial_maxdim)
         sum_all(apply_all.(map(ops -> trunc.(ops), ops)))
     end
-    println("Initial guess done")
 
 
     W = initial_guess
@@ -137,6 +136,5 @@ function sum_of_products(ops::Vector{Vector{MPO}}; maxdim, nsweeps=50, tol=1e-20
     end
     finish!(p)
 
-    @show linkdims(W)
     W
 end
