@@ -105,7 +105,7 @@ end
     end
 end
 
-@testset verbose=true "HUBBARD" begin
+@testset verbose=true "Hubbard" begin
     NUM_STEPS = 100
     DT = 1e-2
     N = 4
@@ -123,4 +123,46 @@ end
             test_tdvp(H, psi_0, NUM_STEPS, DT, MAXDIM, SWEEPS_PER_TIME_STEP, CUTOFF)
         end
     end
+end
+
+function test_sum_of_products(s, local_H_dim)
+    n = length(s)
+    ITensors.set_warn_order(n*2 + 1)
+    rowcol_inds = [prime.(s); dag.(s)]
+
+    random_tensors = [[random_itensor(ComplexF64, rowcol_inds) for _ in 1:3] for _ in 1:10]
+    ops_mpo = [[MPO(T, s) for T in Ts] for Ts in random_tensors]
+
+    multiply(A, B) = replaceprime(A' * B, 2 => 1)
+    exact_result = sum([foldl(multiply, Ts) for Ts in random_tensors])
+    ITensors.reset_warn_order()
+
+    exact_linkdim = Int((local_H_dim^2)^(floor(n/2)))
+
+    should_pass = TensorTimeSteps.sum_of_products(ops_mpo; maxdim=exact_linkdim)
+    @test isapprox(contract(should_pass), exact_result)
+
+    should_fail = TensorTimeSteps.sum_of_products(ops_mpo; maxdim=exact_linkdim-1)
+    @test !isapprox(contract(should_fail), exact_result)
+
+    # maxdim = exact_linkdim ÷ 2
+    # ops_mpo_truncated = [[truncate(mpo; maxdim) for mpo in mpo_list] for mpo_list in ops_mpo]
+    # ITensors.set_warn_order(n*2 + 1)
+    # tensors_truncated = [contract.(mpo_list) for mpo_list in ops_mpo_truncated]
+    # exact_result_truncated = sum([foldl(multiply, Ts) for Ts in tensors_truncated])
+    # ITensors.reset_warn_order()
+
+    # should_pass = TensorTimeSteps.sum_of_products(ops_mpo_truncated; maxdim)
+    # @test isapprox(contract(should_pass), exact_result_truncated)
+
+end
+
+@testset "sum of products Qubit" begin
+    s = siteinds("Qubit", 5)
+    test_sum_of_products(s, 2)
+end
+
+@testset "sum of products Electron" begin
+    s = siteinds("Electron", 3; conserve_qns=true)
+    test_sum_of_products(s, 4)
 end

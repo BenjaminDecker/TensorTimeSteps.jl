@@ -6,6 +6,7 @@ using ITensors
 using ITensorMPS
 using ProgressMeter
 
+include("utils.jl")
 include("tdvp/tdvp.jl")
 
 export tdvp1, tdvp2
