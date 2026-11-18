@@ -1,16 +1,17 @@
 dagger(T) = swapprime(dag(T), 0, 1)
 
-function sum_of_products(ops::Vector{Vector{MPO}}; maxdim, nsweeps=50, tol=1e-20)::MPO
-    initial_guess = let
-        initial_maxdim = maxdim ÷ 4
-        apply_all(op_list) = apply(op_list...; maxdim=initial_maxdim)
-        sum_all(sum_list) = +(sum_list...; maxdim=initial_maxdim)
-        trunc(op) = truncate(op; maxdim=initial_maxdim)
-        sum_all(apply_all.(map(ops -> trunc.(ops), ops)))
+function sum_of_products(ops::Vector{Vector{MPO}}; maxdim, nsweeps=20, tol=1e-20, initial_guess=nothing)::MPO
+    if isnothing(initial_guess)
+        initial_guess = let
+            initial_maxdim = maxdim ÷ 4
+            apply_all(op_list) = apply(op_list...; maxdim=initial_maxdim)
+            sum_all(sum_list) = +(sum_list...; maxdim=initial_maxdim)
+            trunc(op) = truncate(op; maxdim=initial_maxdim)
+            sum_all(apply_all.(map(ops -> trunc.(ops), ops)))
+        end
     end
 
-
-    W = initial_guess
+    W = copy(initial_guess)
     N_sites = length(W)
     N_summands = length(ops)
 

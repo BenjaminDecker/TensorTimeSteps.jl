@@ -139,6 +139,10 @@ function test_sum_of_products(s, local_H_dim)
 
     exact_linkdim = Int((local_H_dim^2)^(floor(n/2)))
 
+    initial_guess = random_mpo(s)
+    should_improve = TensorTimeSteps.sum_of_products(ops_mpo; maxdim=exact_linkdim ÷ 2, initial_guess)
+    @test norm(exact_result - contract(should_improve)) < norm(exact_result - contract(initial_guess))
+
     should_pass = TensorTimeSteps.sum_of_products(ops_mpo; maxdim=exact_linkdim)
     @test isapprox(contract(should_pass), exact_result)
 
