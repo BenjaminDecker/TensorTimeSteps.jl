@@ -1,6 +1,6 @@
 dagger(T) = swapprime(dag(T), 0, 1)
 
-function sum_of_products(ops::Vector{Vector{MPO}}; maxdim::Int, initial_guess::MPO, nsweeps::Int=20, tol::Float64=1e-20, verbose::Bool=false, width::Int=2)::MPO
+function sum_of_products(ops::Vector{Vector{MPO}}; maxdim::Int, initial_guess::MPO, nsweeps::Int=20, tol::Float64=1e-10, verbose::Bool=false, width::Int=2, svd_cutoff::Float64=1e-12)::MPO
     if (width != 1 && width != 2)
         error("Only widths of 1 or 2 are supported")
     end
@@ -52,6 +52,7 @@ function sum_of_products(ops::Vector{Vector{MPO}}; maxdim::Int, initial_guess::M
 
     create_new_Wi(site_idx; width=2) =
         let
+            # TODO create new_Wi without contracting something first
             new_Wi = zero(contract(W[site_idx:(site_idx+width-1)]))
             for summand_idx in 1:N_summands
                 left_side = layers_left[summand_idx][end]
@@ -92,6 +93,7 @@ function sum_of_products(ops::Vector{Vector{MPO}}; maxdim::Int, initial_guess::M
                     new_Wi,
                     left_inds;
                     maxdim=maxdim,
+                    cutoff=svd_cutoff
                 )
                 W[site_idx] = left
                 W[site_idx+1] = contract(S, right)
@@ -117,6 +119,7 @@ function sum_of_products(ops::Vector{Vector{MPO}}; maxdim::Int, initial_guess::M
                     new_Wi,
                     left_inds;
                     maxdim=maxdim,
+                    cutoff=svd_cutoff
                 )
                 W[site_idx+1] = right
                 W[site_idx] = contract(S, left)
