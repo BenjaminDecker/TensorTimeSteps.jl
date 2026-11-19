@@ -1,5 +1,32 @@
-using TensorTimeSteps, Test, ITensors, ITensorMPS, Random, Combinatorics
+using TensorTimeSteps, Test, ITensors, ITensorMPS, Random, Combinatorics, LinearAlgebra
 
+function enable_qn_optimizations(verbose::Bool=false)
+    verbose && println("Enabling qn optimizations")
+    BLAS.set_num_threads(1)
+    ITensors.Strided.disable_threads()
+
+    ITensors.enable_threaded_blocksparse()
+
+    if verbose
+        @show Threads.nthreads()
+        @show BLAS.get_num_threads()
+        @show ITensors.using_threaded_blocksparse()
+    end
+end
+
+function disable_qn_optimizations(verbose::Bool=false)
+    verbose && println("Disabling qn optimizations")
+    BLAS.set_num_threads(Threads.nthreads() ÷ 2)
+    ITensors.Strided.enable_threads()
+
+    ITensors.disable_threaded_blocksparse()
+
+    if verbose
+        @show Threads.nthreads()
+        @show BLAS.get_num_threads()
+        @show ITensors.using_threaded_blocksparse()
+    end
+end
 
 function create_tfim(N; J::Float64=1.0, g::Float64=1.0)::MPO
     s = siteinds("Qubit", N)
@@ -67,6 +94,7 @@ function test_tdvp(
             num_steps=num_steps,
             sweeps_per_time_step=sweeps_per_time_step,
             max_bond_dim=maxdim,
+            verbose=false
         )
         test_against_exact(exact_results, results1)
     end
@@ -81,12 +109,75 @@ function test_tdvp(
             max_bond_dim=maxdim,
             svd_epsilon=cutoff,
             switch_when_maxdim_reached=false,
+            verbose=false
         )
         test_against_exact(exact_results, results2)
     end
 end
 
+rowcol_inds(s) = [prime.(s); dag.(s)]
+
+function random_compressible_tensor(s, decay::Float64=1.0)
+    C = ITensor(ComplexF64, 0.0, rowcol_inds(s))
+
+    c1 = combiner(dag(s))
+    c2 = prime(dag(c1))
+    C = contract(c1, C, c2)
+
+    i1 = combinedind(c1)
+    i2 = combinedind(c2)
+    vals = shuffle(exp.(-decay .* (1:(dim(s[1])^length(s)))))
+    for (i, v) in enumerate(vals)
+        C[i1=>i, i2=>i] = v
+    end
+    C = contract(dag(c1), C, dag(c2))
+
+    T1 = random_itensor(ComplexF64, rowcol_inds(s))
+    T2 = random_itensor(ComplexF64, rowcol_inds(s))
+    T1C = swapprime(T1' * C, 2 => 1)
+    T1CT2 = swapprime(T1C' * T2, 2 => 1)
+    return T1CT2
+end
+
+function test_sum_of_products(s)
+    n = length(s)
+
+    random_tensors = [[random_itensor(ComplexF64, rowcol_inds(s)) for _ in 1:3] for _ in 1:10]
+    random_compressible_tensors = [[random_compressible_tensor(s) for _ in 1:3] for _ in 1:10]
+
+    multiply(A, B) = replaceprime(A' * B, 2 => 1)
+
+    maxdim = Int((dim(s[1])^2)^(floor(n/2)))
+
+    @testset verbose=true "$width-site" for width in 1:2
+        @testset verbose=true "$label" for (label, tensors) in [("Not Compressible", random_tensors), ("Compressible", random_compressible_tensors)]
+            ops_mpo = [[MPO(T, s) for T in Ts] for Ts in tensors]
+            ITensors.set_warn_order(n*2 + 1)
+            exact = sum([foldl(multiply, Ts) for Ts in tensors])
+            ITensors.reset_warn_order()
+
+
+            initial_guess = apply([
+                truncate(op; maxdim) for op in ops_mpo[1]
+            ]...; maxdim)
+            should_pass = TensorTimeSteps.sum_of_products(ops_mpo; maxdim, initial_guess, width, verbose=false)
+            @test isapprox(contract(should_pass), exact)
+
+            truncate!(initial_guess; maxdim=maxdim-1)
+            should_fail = TensorTimeSteps.sum_of_products(ops_mpo; maxdim=maxdim-1, initial_guess, width, verbose=false)
+            @test !isapprox(contract(should_fail), exact)
+
+            if (label=="Compressible")
+                truncate!(initial_guess; maxdim=maxdim ÷ 2)
+                should_improve = TensorTimeSteps.sum_of_products(ops_mpo; maxdim=maxdim ÷ 2, initial_guess, width, verbose=false)
+                @test norm(exact - contract(should_improve)) < norm(exact - contract(initial_guess))
+            end
+        end
+    end
+end
+
 @testset verbose=true "TFIM" begin
+    disable_qn_optimizations()
     NUM_STEPS = 100
     DT = 1e-2
     N = 6
@@ -106,6 +197,7 @@ end
 end
 
 @testset verbose=true "Hubbard" begin
+    enable_qn_optimizations()
     NUM_STEPS = 100
     DT = 1e-2
     N = 4
@@ -125,48 +217,14 @@ end
     end
 end
 
-function test_sum_of_products(s, local_H_dim)
-    n = length(s)
-    ITensors.set_warn_order(n*2 + 1)
-    rowcol_inds = [prime.(s); dag.(s)]
-
-    random_tensors = [[random_itensor(ComplexF64, rowcol_inds) for _ in 1:3] for _ in 1:10]
-    ops_mpo = [[MPO(T, s) for T in Ts] for Ts in random_tensors]
-
-    multiply(A, B) = replaceprime(A' * B, 2 => 1)
-    exact_result = sum([foldl(multiply, Ts) for Ts in random_tensors])
-    ITensors.reset_warn_order()
-
-    exact_linkdim = Int((local_H_dim^2)^(floor(n/2)))
-
-    initial_guess = random_mpo(s)
-    should_improve = TensorTimeSteps.sum_of_products(ops_mpo; maxdim=exact_linkdim ÷ 2, initial_guess)
-    @test norm(exact_result - contract(should_improve)) < norm(exact_result - contract(initial_guess))
-
-    should_pass = TensorTimeSteps.sum_of_products(ops_mpo; maxdim=exact_linkdim)
-    @test isapprox(contract(should_pass), exact_result)
-
-    should_fail = TensorTimeSteps.sum_of_products(ops_mpo; maxdim=exact_linkdim-1)
-    @test !isapprox(contract(should_fail), exact_result)
-
-    # maxdim = exact_linkdim ÷ 2
-    # ops_mpo_truncated = [[truncate(mpo; maxdim) for mpo in mpo_list] for mpo_list in ops_mpo]
-    # ITensors.set_warn_order(n*2 + 1)
-    # tensors_truncated = [contract.(mpo_list) for mpo_list in ops_mpo_truncated]
-    # exact_result_truncated = sum([foldl(multiply, Ts) for Ts in tensors_truncated])
-    # ITensors.reset_warn_order()
-
-    # should_pass = TensorTimeSteps.sum_of_products(ops_mpo_truncated; maxdim)
-    # @test isapprox(contract(should_pass), exact_result_truncated)
-
-end
-
-@testset "sum of products Qubit" begin
+@testset verbose=true "sum of products Qubit" begin
+    disable_qn_optimizations()
     s = siteinds("Qubit", 5)
-    test_sum_of_products(s, 2)
+    test_sum_of_products(s)
 end
 
-@testset "sum of products Electron" begin
+@testset verbose=true "sum of products Electron" begin
+    enable_qn_optimizations()
     s = siteinds("Electron", 3; conserve_qns=true)
-    test_sum_of_products(s, 4)
+    test_sum_of_products(s)
 end

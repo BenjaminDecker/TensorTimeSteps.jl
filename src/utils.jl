@@ -1,14 +1,8 @@
 dagger(T) = swapprime(dag(T), 0, 1)
 
-function sum_of_products(ops::Vector{Vector{MPO}}; maxdim, nsweeps=20, tol=1e-20, initial_guess=nothing)::MPO
-    if isnothing(initial_guess)
-        initial_guess = let
-            initial_maxdim = maxdim ÷ 4
-            apply_all(op_list) = apply(op_list...; maxdim=initial_maxdim)
-            sum_all(sum_list) = +(sum_list...; maxdim=initial_maxdim)
-            trunc(op) = truncate(op; maxdim=initial_maxdim)
-            sum_all(apply_all.(map(ops -> trunc.(ops), ops)))
-        end
+function sum_of_products(ops::Vector{Vector{MPO}}; maxdim::Int, initial_guess::MPO, nsweeps::Int=20, tol::Float64=1e-20, verbose::Bool=false, width::Int=2)::MPO
+    if (width != 1 && width != 2)
+        error("Only widths of 1 or 2 are supported")
     end
 
     W = copy(initial_guess)
@@ -48,11 +42,9 @@ function sum_of_products(ops::Vector{Vector{MPO}}; maxdim, nsweeps=20, tol=1e-20
             push!(layers, layer)
         end
 
-    ops = [[truncate(A; maxdim) for A in As] for As in ops]
-
     orthogonalize!(W, 1)
 
-    for _ in reverse(3:N_sites)
+    for _ in reverse((1+width):N_sites)
         for summand_idx in 1:N_summands
             push_layer(summand_idx, :right)
         end
@@ -87,35 +79,49 @@ function sum_of_products(ops::Vector{Vector{MPO}}; maxdim, nsweeps=20, tol=1e-20
     p = Progress(nsweeps; showspeed=true)
     prev_norm2 = norm(W[1])^2
     for sweep in 1:nsweeps
-        for site_idx in 1:(N_sites-1) #forwards
-            new_Wi = create_new_Wi(site_idx; width=2)
-            left_inds = uniqueinds(W[site_idx], W[site_idx+1])
-            left, S, right = svd(
-                new_Wi,
-                left_inds;
-                maxdim=maxdim,
-            )
-            W[site_idx] = left
-            W[site_idx+1] = contract(S, right)
-            ITensorMPS.set_ortho_lims!(W, (site_idx+1):(site_idx+1))
+        for site_idx in 1:(N_sites-width+1) #forwards
+            new_Wi = create_new_Wi(site_idx; width)
+            if width==1
+                W[site_idx] = new_Wi
+                if site_idx < N_sites
+                    orthogonalize!(W, site_idx+1)
+                end
+            else
+                left_inds = uniqueinds(W[site_idx], W[site_idx+1])
+                left, S, right = svd(
+                    new_Wi,
+                    left_inds;
+                    maxdim=maxdim,
+                )
+                W[site_idx] = left
+                W[site_idx+1] = contract(S, right)
+                ITensorMPS.set_ortho_lims!(W, (site_idx+1):(site_idx+1))
+            end
             for summand_idx in 1:N_summands
-                if site_idx < (N_sites-1)
+                if site_idx < (N_sites-width+1)
                     pop!(layers_right[summand_idx])
                     push_layer(summand_idx, :left)
                 end
             end
         end
-        for site_idx in reverse(1:(N_sites-1)) #backwards
-            new_Wi = create_new_Wi(site_idx; width=2)
-            left_inds = uniqueinds(W[site_idx], W[site_idx+1])
-            left, S, right = svd(
-                new_Wi,
-                left_inds;
-                maxdim=maxdim,
-            )
-            W[site_idx+1] = right
-            W[site_idx] = contract(S, left)
-            ITensorMPS.set_ortho_lims!(W, (site_idx:site_idx))
+        for site_idx in reverse(1:(N_sites-width+1)) #backwards
+            new_Wi = create_new_Wi(site_idx; width)
+            if width==1
+                W[site_idx] = new_Wi
+                if site_idx > 1
+                    orthogonalize!(W, site_idx-1)
+                end
+            else
+                left_inds = uniqueinds(W[site_idx], W[site_idx+1])
+                left, S, right = svd(
+                    new_Wi,
+                    left_inds;
+                    maxdim=maxdim,
+                )
+                W[site_idx+1] = right
+                W[site_idx] = contract(S, left)
+                ITensorMPS.set_ortho_lims!(W, (site_idx:site_idx))
+            end
             for summand_idx in 1:N_summands
                 if site_idx > 1
                     pop!(layers_left[summand_idx])
@@ -126,7 +132,7 @@ function sum_of_products(ops::Vector{Vector{MPO}}; maxdim, nsweeps=20, tol=1e-20
 
         norm2 = norm(W[1])^2
         rel_change = abs(norm2 - prev_norm2) / norm2
-        update!(p, sweep; showvalues=[
+        verbose && update!(p, sweep; showvalues=[
             ("linkdims", linkdims(W)),
             ("relative change", rel_change),
         ])
@@ -135,7 +141,7 @@ function sum_of_products(ops::Vector{Vector{MPO}}; maxdim, nsweeps=20, tol=1e-20
         end
         prev_norm2 = norm2
     end
-    finish!(p)
+    verbose && finish!(p)
 
     W
 end
