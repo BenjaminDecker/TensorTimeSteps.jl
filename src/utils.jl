@@ -50,31 +50,27 @@ function sum_of_products(ops::Vector{Vector{MPO}}; maxdim::Int, initial_guess::M
         end
     end
 
-    create_new_Wi(site_idx; width=2) =
+    create_new_Wi(site_idx; width=2) = sum((
         let
-            # TODO create new_Wi without contracting something first
-            new_Wi = zero(contract(W[site_idx:(site_idx+width-1)]))
-            for summand_idx in 1:N_summands
-                left_side = layers_left[summand_idx][end]
-                right_side = layers_right[summand_idx][end]
+            left_side = layers_left[summand_idx][end]
+            right_side = layers_right[summand_idx][end]
 
-                new_Wi_term = right_side
+            new_Wi_term = right_side
 
-                for idx in reverse(site_idx:(site_idx+width-1))
-                    for T in ops[summand_idx]
-                        site_tags = "Site,n=$idx"
-                        new_Wi_term = replaceprime(
-                            contract(prime(new_Wi_term; tags=site_tags), T[idx]),
-                            2 => 1;
-                            tags=site_tags,
-                        )
-                    end
+            for idx in reverse(site_idx:(site_idx+width-1))
+                for T in ops[summand_idx]
+                    site_tags = "Site,n=$idx"
+                    new_Wi_term = replaceprime(
+                        contract(prime(new_Wi_term; tags=site_tags), T[idx]),
+                        2 => 1;
+                        tags=site_tags,
+                    )
                 end
-                new_Wi_term = contract(new_Wi_term, left_side)
-                new_Wi += new_Wi_term
             end
-            new_Wi
+            contract(new_Wi_term, left_side)
         end
+        for summand_idx in 1:N_summands
+    ))
 
 
     p = Progress(nsweeps; showspeed=true)
